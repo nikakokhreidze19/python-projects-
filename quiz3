@@ -1,0 +1,70 @@
+import requests
+import json
+import sqlite3
+
+city = 'Tbilisi'
+key = '82191ace17a24c834a4e6d839cff6b12'
+number_of_days = 2
+type_of_temperature = str(input("შეიყვანეთ ტემპერატურა რომელ საზომ ერთეულში გინდათ:თუ გინდათ ფარეინჰეიტში ჩაწერეთ სიტყვა-imperial,თუ გინდათ ცელსიუსში მაშინ - metric, ხოლო თუ გინდათ ნაგულისხმევი(default) მაშინ-standard : " ))
+payload = {'q' : city , 'appid' :key,'cnt':number_of_days,'units':type_of_temperature}
+url = "http://api.openweathermap.org/data/2.5/forecast"
+response = requests.get(url,params=payload)
+print("response headers: ")
+print(response.headers)
+print("response status_code: ")
+print(response.status_code)
+print("response url: ")
+print(response.url)
+print("response text: ")
+print(response.text)
+
+
+result = response.json()
+with open('data_of_weather.json','w') as file:
+    json.dump(result,file,indent=4)
+result_json = response.text
+result_dict = json.loads(result_json)
+# იმისათვის რომ დიქტ იყოს ლამაზად და სტრუქტურულად წარმოდგენილი ვიყენებთ dumps მეთოდს
+result_structured = json.dumps(result_dict,indent=4)
+print(result_structured)
+# ამ შემთხვევაში ჩვენ გვსურს მივწვდეთ ქალაქის დასახელებას
+city_name = result_dict['city']['name']
+print("ქალაქის დასახელებაა: ",city_name)
+# ამ შემთხვევაში ტემპერატურას და ამინდს დღევანდელი  დღის
+sysdate= result_dict['list'][0]['dt_txt']
+print("თარიღი:",sysdate)
+today_temperature = result_dict['list'][0]['main']['temp']
+print("დღევანდელი დღეს არსებული  ტემპერატურა: ",today_temperature)
+today_weather=result_dict['list'][1]['weather'][0]['main']
+print("დღევანდელი დღის ამინდი: ",today_weather)
+today_wind_speed = result_dict['list'][0]['wind']['speed']
+print("ქარის სიჩქარეა :",today_wind_speed)
+# და მომდევნო დღეს არსებული ტემპერატურას და ამინდს
+next_date = result_dict['list'][1]['dt_txt']
+print("თარიღი: ",next_date)
+next_temperature = result_dict['list'][1]['main']['temp']
+print("ხვალინდელი ტემპერატურა: ",next_temperature)
+next_weather = result_dict['list'][1]['weather'][0]['main']
+print("ხვალინდელი დღის ამინდის პროგნოზია: ",next_weather)
+next_wind_speed = result_dict['list'][1]['wind']['speed']
+print("ქარის სიჩქარეა :",next_wind_speed)
+
+
+# მე მსურს შევქმნა მონაცემთა ბაზა და მასთან ვ ამყარებ კავშირს ხოლო შემდგომში კურსორ მეთოდის საჭუალებით ვახდენ ცხრილის
+# ცხრილის შექმნას რომელსაც ექნება სასურველი მონაცემები სადაც ჩაიწერება ჩვენს მიერ წამოღებული ინფორმაცია ,ინფორმაციას ვაგროვებ ლისტში და პირდაპირ ვაგდებ ფუნქციაში
+# ასევე გაწერილია თუ როგორი ტიპის მონაცემები იქნება ცხრილში გამოყენებული
+connect = sqlite3.connect("weather_data.sqlite")
+cursor = connect.cursor()
+cursor.execute('''CREATE TABLE weather
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                city_name VARCHAR(50),
+                date DATETIME,
+                temperature FLOAT,
+                weather VARCHAR(50),
+                wind_speed FLOAT); ''')
+weather = [
+         (city_name, sysdate, today_temperature,today_weather,today_wind_speed ),
+         (city_name, next_date,next_temperature,next_weather,next_wind_speed ),
+      ]
+cursor.executemany('INSERT INTO weather (city_name, date, temperature,weather,wind_speed) VALUES (?, ?, ?,?,?)', weather)
+connect.commit()
